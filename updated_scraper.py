@@ -11,7 +11,7 @@ import pandas as pd
 
 # =========================== Please read ===============================
 # Academic purpose only. Please comply with the relevant laws and regulations.
-# Prepared by Kaicheng Luo @ Harvard Econ, latest update 7 Sep 2021
+# Prepared by Kaicheng Luo @ Harvard Econ, latest update 24 Sep 2021
 # For a demo of how to use the scraper, check out demo.ipynb
 # =========================== Instructions ends =========================
 
@@ -81,9 +81,7 @@ class PkuScraper:
         'Openwave/ UCWEB7.0.2.37/28/999',
         'Mozilla/4.0 (compatible; MSIE 6.0; ) Opera/UCWEB7.0.2.37/28/999'
     ]
-    # V5 depreciated, that corresponds to the older version of pkulaw.cn
-    # Cookies_V5 = 'FWinCookie=1; ASP.NET_SessionId=pbx0sq3wltupgmimpao24gp2; QINGCLOUDELB=f7fbfc03a670863f34b0656d2e114d6fec61ed2f1b6f7d61f04556fafeaf0c45; Hm_lvt_58c470ff9657d300e66c7f33590e53a8=1597290295; Hm_lvt_b196e3c9d71b8c7dfa4d1d668cee40f0=1597290295; CookieId=pbx0sq3wltupgmimpao24gp2; CheckIPAuto=0; CheckIPDate=2020-08-13 12:04:42; pbx0sq3wltupgmimpao24gp2isIPlogin=1; User_User=%b1%b1%be%a9%b4%f3%d1%a7; Hm_lpvt_58c470ff9657d300e66c7f33590e53a8=1597291500; ' \
-    #              'Hm_lpvt_b196e3c9d71b8c7dfa4d1d668cee40f0=1597291500'
+
     input_types = ['url', 'keyword', '']
     output_types = ['name', 'gid', 'titles', 'soups', '']
     versions = ['V5', 'V6']
@@ -140,6 +138,43 @@ class PkuScraper:
         'unspecified': ''
     }
 
+    # Debug section starts here
+    headers = {
+        'Cookie': Cookies_V6,
+        'Origin': 'https://www.pkulaw.com',
+        'Host': 'www.pkulaw.com',
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+        'User-Agent': random.choice(User_Agents),
+        'X-Requested-With': 'XMLHttpRequest',
+        'Referer': 'https://www.pkulaw.com/law/chl?Keywords=%E8%AF%81%E7%85%A7%E5%88%86%E7%A6%BB',
+        'sec-ch-ua': '"Google Chrome";v="93", " Not;A Brand";v="99", "Chromium";v="93"',
+        'sec-ch-ua-platform': '"macOS"',
+        'sec-ch-ua-mobile': '?0'
+    }
+
+    data = {
+        'Menu': 'law',
+        'SearchKeywordType': 'Title',
+        'MatchType': 'Exact',
+        'RangeType': 'Piece',
+        'Library': 'chl',
+        'Pager.PageIndex': 0,
+        'Keywords': '',
+        'ClassCodeKey': ',,,,,,',
+        'ShowType': 'Default',
+        'Pager.PageSize': 10,
+        'RecordShowType': 'List',
+        'QueryOnClick': 'False',
+        'AfterSearch': 'True',
+        'GroupByIndex': 0,
+        'newPageIndex': 0,
+        'OrderByIndex': 4,
+        'isEng': 'chinese',
+        'IsSynonymSearch': "true"
+    }
+    # debug section ends here
+
+
     def set_input_type(self, input_t):
         assert input_t in self.input_types, 'Invalid Input Type'
         self.input_type = input_t
@@ -171,23 +206,6 @@ class PkuScraper:
 
     def edit_postform(self, dic):
         self.update_dic = dic
-
-    # def decode_page_v5(self, url):
-    #     # depreciated
-    #     """
-    #     DOCUMENT PAGE
-    #     URL -> Soup Object
-    #     Version: https://www.PKULaw.cn.
-    #     Scraper Detection: time.sleep(2) if the number of requests exceeds 100.
-    #     Access Requirement: Cookies.
-    #     Output: soupObj that can be decoded by the CentralPolicy_V5 class
-    #     """
-    #     headers = {
-    #         'Cookie': self.Cookies_V5,
-    #         'User-Agent': random.choice(self.User_Agents)
-    #     }
-    #     response = requests.get(url, headers=headers)
-    #     return BeautifulSoup(response.text, 'lxml')
 
     def decode_page_v6(self, url):
         """
@@ -404,11 +422,39 @@ class PkuScraper:
         return final_lst
     
 
-    def search_full_library(self, year):
-        """
-        :param year: int, The year of library search 
-        :return pd.DataFrame object: For each year & each locality & each category, the number of documents issued within its cluster
-        """
+    def get_locality_id(self):
+        url = "https://pkulaw.com/Tool/SingleClassResult"
+        headers = self.headers
+        data = {
+            'library': 'lar',
+            'className': 'IssueDepartment',
+            'Aggs': '{"RelatedPrompted":"","EffectivenessDic":"","SpecialType":"","IssueDepartment":"","TimelinessDic":"","Category":"","IssueDate":""}',
+            'keyword': '',
+            'ClassFlag': 'lar',
+            'KeywordType': 'Title',
+            'MatchType': 'Exact'
+        }
+        response = requests.post(url, headers=headers, data=data)
+        return response
+
+    def get_category_dist(self, _debug=False):
+        url = "https://pkulaw.com/Tool/SingleClassResult"
+        headers = self.headers
+        data = {
+            'library': 'lar',
+            'className': 'Category',
+            'Aggs': '{"RelatedPrompted":"","EffectivenessDic":"","SpecialType":"","IssueDepartment":"","TimelinessDic":"","Category":"","IssueDate":""}',
+            'keyword': '',
+            'ClassFlag': 'lar',
+            'KeywordType': 'Title',
+            'MatchType': 'Exact'
+        }
+        if _debug:
+            data.update(self.update_dic)
+
+        response = requests.post(url, headers=headers, data=data)
+        return response
+
 
 
 # =========================== Dividing line for testing functions ===========================
