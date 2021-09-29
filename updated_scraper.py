@@ -455,7 +455,38 @@ class PkuScraper:
         response = requests.post(url, headers=headers, data=data)
         return response
 
-
+    def search_largescale(self, keyword):
+        # The idea is: first ask for a json response regarding what are the entities that issued those documents; then do searchings.
+        # Step 1:
+        url = "https://pkulaw.com/Tool/SingleClassResult"
+        headers = self.headers
+        data = {
+            'library': 'lar',
+            'className': 'IssueDepartment',
+            'Aggs': '{"RelatedPrompted":"","EffectivenessDic":"","SpecialType":"","IssueDepartment":"","TimelinessDic":"","Category":"","IssueDate":""}',
+            'keyword': keyword,
+            'ClassFlag': 'lar',
+            'KeywordType': 'Title',
+            'MatchType': 'Exact'
+        }
+        response = requests.post(url, headers=headers, data=data)
+        jsonString = response.text.replace(r'\r', '').replace(r'\n', '')
+        dict_list = json.loads(jsonString)
+        dict_list = pd.DataFrame(dict_list)
+        id_list = dict_list['id'].unique()
+        id_list = [x for x in id_list if len(x) <= 3] # Breaking it down into provincial searches shall be enough
+        print(id_list)
+        # Step 2:
+        lst = [[], [], [], []]
+        for id_ in id_list:
+            self.edit_postform({'Aggs.IssueDepartment': id_})
+            templst = self.search_page_V6(keyword)
+            lst = [lst[x] + templst[x] for x in range(0, 4)]
+            if len(lst[0]) > 0:
+                print('Success')
+            else:
+                print('Failed to scrape')
+        return lst
 
 # =========================== Dividing line for testing functions ===========================
     # Those are the beta version that still cannot run. 
