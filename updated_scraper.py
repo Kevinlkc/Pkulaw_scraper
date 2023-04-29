@@ -8,17 +8,24 @@ import time
 import base64
 from PIL import Image
 import pandas as pd
+from datetime import date, timedelta
+
+def daterange(start_date, end_date):
+    # :params start_date: datetime.date object, e.g. date(2021, 10, 31)
+    for n in range(int((end_date - start_date).days)):
+        yield (start_date + timedelta(n)).strftime("%Y.%m.%d"), (start_date + timedelta(n)).strftime("%Y.%m.%d")
 
 # =========================== Please read ===============================
 # Academic purpose only. Please comply with the relevant laws and regulations.
 # Prepared by Kaicheng Luo @ Harvard Econ, latest update 24 Sep 2021
 # For a demo of how to use the scraper, check out demo.ipynb
+# We thank https://github.com/MrBeike/pkulaw/blob/master/pkulaw.py for suggestions
 # =========================== Instructions ends =========================
 
 class PkuScraper:
     # Update this cookie whenever you use it, you can also get it updated by calling __self__.set_cookie(_str)
-    Cookies_V6 = 'xCloseNew=8; Hm_lvt_8266968662c086f34b2a3e2ae9014bf8=1630066629,1631060463; pkulaw_v6_sessionid=0zwgpxbk10jpsexxknqg4mm1; authormes=5f8e703755203640a7baa1c56e09ce5616c7268dca732f3b39028526dff6560a10f8eedcbd05b937bdfb; Hm_lpvt_8266968662c086f34b2a3e2ae9014bf8=1631061484'
-    # EDITS end here!
+    Cookies_V6 = 'pkulaw_v6_sessionid=i2qbqpjnpx34ouumcrgkhuam; Hm_lvt_8266968662c086f34b2a3e2ae9014bf8=1633483104,1634330317; TKMessage=YAfPC0z71+e8kxUkGk7rMHJ1bDFfWvc/+qxMa1B5rctpeO10LUflQK7aa0og3WSYg5zhrx9STmtz3qRPoP4e7pUXWGKxebNkuOtHNXwQsRKH2HHg9IJbcWi4Jx9Lr4qRG/rs8pGXHUB41eDyigEf9vvEx2oNUHxVQptclv3WtZSv2D+bXUyhtwev8p5KfrVF/wBWIVRJ2WbTRZF7Hcmwt0/Jk/Cc9yT2VWrlmI+b5Clv+XEOzBb0Qrjnxbw9cypp; authormes=5f8e703755203640a7baa1c56e09ce5616c7268dca732f3b39028526dff6560a10f8eedcbd05b937bdfb; Hm_lpvt_8266968662c086f34b2a3e2ae9014bf8=1635688347; xCloseNew=1'
+      # EDITS end here!
 
     def __init__(self, input_t='', output_t='', version='V6'):
         assert input_t in self.input_types, 'Invalid Input Type'
@@ -317,7 +324,6 @@ class PkuScraper:
             if max_page > 20:
                 print(min(max_page, self.max_page))
                 print(self.keyword)
-                break
             for page in range(min(max_page, self.max_page)):
                 soup = get_one_page(page_index=page, class_code=class_code_key)
                 extract_info(soup)
@@ -481,12 +487,111 @@ class PkuScraper:
         for id_ in id_list:
             self.edit_postform({'Aggs.IssueDepartment': id_})
             templst = self.search_page_V6(keyword)
+            time.sleep(2)
             lst = [lst[x] + templst[x] for x in range(0, 4)]
             if len(lst[0]) > 0:
-                print('Success')
+                # print('Success')
+                pass
             else:
                 print('Failed to scrape')
         return lst
+
+# ==========================================================================================
+# ============================== Advanced search by date ===================================
+# ==========================================================================================
+    def search_page_adv(self, today, tmr, _debug=False, SearchKeywordType='DefaultSearch'):
+        """
+        SEARCH PAGE
+        class_code_key
+        :return: [Titles, Time, Gids, Urls]
+        """
+        assert self.input_type == 'keyword', 'Please specify input type: keyword'
+        names, relatedinfo, gids, urls = [], [], [], []
+
+
+        def get_one_page(page_index=0, class_code=',,,,,'):
+            url = 'https://www.pkulaw.com/law/search/RecordSearch'
+            headers = {
+                'Cookie': self.Cookies_V6,
+                'Origin': 'https://www.pkulaw.com',
+                'Host': 'www.pkulaw.com',
+                'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+                'User-Agent': random.choice(self.User_Agents),
+                'X-Requested-With': 'XMLHttpRequest',
+                'Referer': 'https://www.pkulaw.com/law/chl?Keywords=%E8%AF%81%E7%85%A7%E5%88%86%E7%A6%BB',
+                'sec-ch-ua': '"Google Chrome";v="93", " Not;A Brand";v="99", "Chromium";v="93"',
+                'sec-ch-ua-platform': '"macOS"',
+                'sec-ch-ua-mobile': '?0'
+            }
+            data = {
+                'Menu': 'law',
+                'SearchKeywordType': 'Title',
+                'MatchType': 'Exact',
+                'RangeType': 'Piece',
+                'Library': self.library,
+                'Pager.PageIndex': page_index,
+                'Keywords': '',
+                'ClassCodeKey': class_code,
+                'IsAdv': 'True',
+                'AdvSearchDic.RatifyDate': "{ 'Start': '', 'End': '' }",
+                'AdvSearchDic.IssueDate': "{ 'Start': '"+ today +"', 'End': '"+tmr+"' }",
+                'AdvSearchDic.ImplementDate': "{ 'Start': '', 'End': '' }",
+                'ShowType': 'Default',
+                'Pager.PageSize': 10,
+                'RecordShowType': 'List',
+                'QueryOnClick': 'False',
+                'AfterSearch': 'True',
+                'GroupByIndex': 0,
+                'newPageIndex': page_index,
+                'OrderByIndex': 4,
+                'isEng': 'chinese',
+                'IsSynonymSearch': "true"
+            }
+            data.update(self.update_dic)
+            response = requests.post(url, headers=headers, data=data)
+            return BeautifulSoup(response.text, 'lxml')
+
+        def get_count(soup):
+            try:
+                return int(soup.find("span" ,class_="total").find('strong').text)
+            except:
+                return 0
+
+        def extract_info(soup):
+            for a in soup.find_all('div', class_='block'):
+                try:
+                    content = a.find('a', target="_blank", flink="true")
+                    names.append(content.text)
+                    matchObj = re.match(r'/' + self.library + '/(.*).html(.*)', content['href'])
+                    if matchObj:
+                        gids.append(matchObj.group(1))
+                        urls.append('https://www.pkulaw.cn/fulltext_form.aspx?Db=chl&Gid=' + matchObj.group(1))
+                except:
+                    pass
+            for b in soup.find_all('div', class_='related-info'):
+                try:
+                    relatedinfo.append(b.text.replace('\n', '').replace('\r', '').strip())
+                except:
+                    pass
+
+        for class_code_key in self.class_code_key:
+            temp_soup = get_one_page(page_index=0, class_code=class_code_key)
+            if _debug == True:
+                return temp_soup
+
+            max_page = (get_count(temp_soup)-1) // 10 + 1
+            if max_page > 20:
+                print(min(max_page, self.max_page))
+                print(self.keyword)
+            for page in range(min(max_page, self.max_page)):
+                soup = get_one_page(page_index=page, class_code=class_code_key)
+                extract_info(soup)
+
+        return [names, relatedinfo, urls, gids]
+
+
+
+
 
 # =========================== Dividing line for testing functions ===========================
     # Those are the beta version that still cannot run. 
